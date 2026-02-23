@@ -24,6 +24,9 @@
     "test:watch": "vitest",
     "prepublishOnly": "npm run build && npm test",
     "prepack": "npm install",
+    "bench:download": "tsx benchmarks/scripts/download-dataset.ts",
+    "bench:run": "tsx benchmarks/scripts/run-benchmark.ts",
+    "bench:quick": "tsx benchmarks/scripts/run-benchmark.ts --quick",
     "publish:dry": "npm publish --dry-run",
     "publish:beta": "npm publish --tag beta",
     "publish:latest": "npm publish"
