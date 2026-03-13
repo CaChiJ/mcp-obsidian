@@ -1,13 +1,16 @@
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import { SearchService } from '../../src/search.js';
 import { PathFilter } from '../../src/pathfilter.js';
 import { loadCorpus, loadQueries, loadQrels } from './dataset-loader.js';
 import { buildVault } from './vault-builder.js';
 import { ndcg, recall, mrr, latencyStats } from './metrics.js';
 import type { BenchmarkReport } from './types.js';
+import { SemanticSearchService } from '../../src/search/semantic-search.js';
+import { VectorStore } from '../../src/search/vector-store.js';
+import { EmbeddingAdapter } from '../../src/embedding/types.js';
 
 export interface RunOptions {
+  embedder: EmbeddingAdapter;
   datasetDir: string;
   vaultDir: string;
   maxQueries?: number;
@@ -16,7 +19,7 @@ export interface RunOptions {
 }
 
 export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport> {
-  const { datasetDir, vaultDir, maxQueries, algorithm = 'substring' } = options;
+  const { embedder, datasetDir, vaultDir, maxQueries, algorithm = 'substring' } = options;
   const totalStart = performance.now();
 
   // Load dataset
@@ -32,7 +35,8 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
   }
 
   // Prepare search service
-  const search = new SearchService(vaultDir, new PathFilter());
+  const vectorStore = new VectorStore(vaultDir, embedder);
+  const search = new SemanticSearchService(vaultDir, new PathFilter(), vectorStore);
 
   // Run queries
   const kValues = [5, 10];
