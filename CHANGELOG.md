@@ -5,6 +5,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-12
+
+### Changed
+- Package renamed to `@bitbonsai/mcpvault` on npm at Obsidian's request — update your config by replacing `mcpvault` with `@bitbonsai/mcpvault`
+
+## [0.8.2] - 2026-03-08
+
+### Added
+- Support for Obsidian first-party note formats: `.base` and `.canvas`
+- Optional CLI startup without vault path argument (defaults to current working directory)
+
+### Changed
+- Website install/docs refreshed with optional CWD mode guidance and updated release notes
+- Website UX polish: collapsible install helpers, improved update callout behavior, and icon consistency
+
+### Fixed
+- `write_note` and `update_frontmatter` now safely handle frontmatter values passed as JSON strings
+- npm publish metadata cleanup for binary mapping and repository URL consistency
+
+## [0.8.1] - 2026-02-27
+
+### Added
+- New `move_file` tool for binary-safe file moves with explicit path confirmation
+
+### Changed
+- Search relevance improvements for multi-word BM25 ranking
+- Better support for non-note filenames in directory listing visibility
+
+### Fixed
+- `patch_note` undefined/null validation hardening
+
+## [0.7.5] - 2026-02-16
+
+### Changed
+- Search now matches note filenames in addition to content
+- Hidden directories are filtered from listings
+- OpenCode install docs and setup guidance updated
+
+## [0.7.4] - 2026-01-24
+
+### Added
+- `get_vault_stats` tool for vault-wide stats and recent file metadata
+
+### Changed
+- Improved error messages with actionable remediation suggestions
+
+## [0.7.3] - 2025-12-21
+
+### Fixed
+- Folder detection bug for directories containing dots in names
+
+## [0.7.2] - 2025-12-08
+
+### Fixed
+- Security hardening improvements including TOCTOU protections and regex injection prevention
+
+### Changed
+- CI/CD coverage improvements for reliability and release safety
+
 ## [0.6.3] - 2025-10-10
 
 ### Added
@@ -107,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Node.js compatibility**: Full Node.js runtime support (v18.0.0+)
-- **npm distribution**: Published as npm package `@mauricio.wolff/mcp-obsidian`
+- **npm distribution**: Published as npm package `mcpvault`
 - **TypeScript tooling**: Added tsx for development and tsc for building
 - **Vitest testing**: Replaced Bun test with Vitest test runner
 
@@ -128,7 +187,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Multi-platform support**: Claude Desktop, Claude Code, ChatGPT Desktop, IntelliJ IDEA support
 
 ### Changed
-- **Package scope**: Migrated to scoped npm package `@mauricio.wolff/mcp-obsidian`
+- **Package scope**: Migrated to scoped npm package `mcpvault`
 - **Documentation**: Made README AI-agnostic with comprehensive examples
 - **Version consistency**: Synchronized version across all files
 
@@ -144,7 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Error handling**: Improved error messages and validation
 
 ### Changed
-- **Project name**: Renamed from mcp-fs-obsidian to mcp-obsidian
+- **Project name**: Renamed from mcp-fs-obsidian to mcpvault
 - **Bun optimization**: Pure Bun implementation with native APIs
 - **Documentation**: Significantly improved README with examples
 
@@ -179,7 +238,7 @@ If you were using the Bun version, update your configuration:
 ```json
 {
   "command": "bunx",
-  "args": ["mcp-obsidian", "/path/to/vault"]
+  "args": ["mcpvault", "/path/to/vault"]
 }
 ```
 
@@ -187,7 +246,7 @@ If you were using the Bun version, update your configuration:
 ```json
 {
   "command": "npx",
-  "args": ["@mauricio.wolff/mcp-obsidian@latest", "/path/to/vault"]
+  "args": ["@bitbonsai/mcpvault@latest", "/path/to/vault"]
 }
 ```
 
@@ -206,4 +265,4 @@ All versions include security measures:
 
 - **Node.js**: v18.0.0 or later required
 - **MCP Clients**: Claude Desktop, Claude Code, ChatGPT Desktop, IntelliJ IDEA 2025.1+
-- **File Types**: .md, .markdown, .txt files supported
+- **File Types**: .md, .markdown, .txt, .base, .canvas files supported

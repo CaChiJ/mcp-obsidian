@@ -1,5 +1,5 @@
 import { join, resolve, relative, dirname } from 'path';
-import { readdir, stat, readFile, writeFile, unlink, mkdir, access } from 'node:fs/promises';
+import { readdir, stat, readFile, writeFile, unlink, mkdir, access, rename, copyFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { FrontmatterHandler } from './frontmatter.js';
 import { PathFilter } from './pathfilter.js';
@@ -67,6 +67,10 @@ export class FileSystemService {
         const fullPath = this.resolvePath(path);
         if (!this.pathFilter.isAllowed(path)) {
             throw new Error(`Access denied: ${path}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`);
+        }
+        // Validate content is a defined string to prevent writing literal "undefined"
+        if (content === undefined || content === null) {
+            throw new Error(`Content is required for writing a note: ${path}. The content parameter must be a string.`);
         }
         // Validate frontmatter if provided
         if (frontmatter) {
@@ -141,7 +145,7 @@ export class FileSystemService {
                 message: 'oldString cannot be empty'
             };
         }
-        if (newString === '') {
+        if (!newString) {
             return {
                 success: false,
                 path,
@@ -212,7 +216,7 @@ export class FileSystemService {
             const directories = [];
             for (const entry of entries) {
                 const entryPath = normalizedPath ? `${normalizedPath}/${entry.name}` : entry.name;
-                if (!this.pathFilter.isAllowed(entryPath)) {
+                if (!this.pathFilter.isAllowedForListing(entryPath)) {
                     continue;
                 }
                 if (entry.isDirectory()) {
@@ -407,6 +411,126 @@ export class FileSystemService {
             };
         }
     }
+    async moveFile(params) {
+        const { oldPath, newPath, confirmOldPath, confirmNewPath, overwrite = false } = params;
+        if (oldPath !== confirmOldPath || newPath !== confirmNewPath) {
+            return {
+                success: false,
+                oldPath,
+                newPath,
+                message: "Move cancelled: confirmation paths do not match. For safety, oldPath must equal confirmOldPath and newPath must equal confirmNewPath."
+            };
+        }
+        if (!this.pathFilter.isAllowedForListing(oldPath)) {
+            return {
+                success: false,
+                oldPath,
+                newPath,
+                message: `Access denied: ${oldPath}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`
+            };
+        }
+        if (!this.pathFilter.isAllowedForListing(newPath)) {
+            return {
+                success: false,
+                oldPath,
+                newPath,
+                message: `Access denied: ${newPath}. This path is restricted (system files like .obsidian, .git, and dotfiles are not accessible).`
+            };
+        }
+        const oldFullPath = this.resolvePath(oldPath);
+        const newFullPath = this.resolvePath(newPath);
+        try {
+            const sourceStat = await stat(oldFullPath);
+            if (sourceStat.isDirectory()) {
+                return {
+                    success: false,
+                    oldPath,
+                    newPath,
+                    message: `Source path is a directory: ${oldPath}. move_file currently supports files only.`
+                };
+            }
+        }
+        catch (error) {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+                return {
+                    success: false,
+                    oldPath,
+                    newPath,
+                    message: `Source file not found: ${oldPath}. Use list_directory to see available files.`
+                };
+            }
+            return {
+                success: false,
+                oldPath,
+                newPath,
+                message: `Failed to inspect source file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            };
+        }
+        try {
+            if (!overwrite) {
+                try {
+                    await access(newFullPath, constants.F_OK);
+                    return {
+                        success: false,
+                        oldPath,
+                        newPath,
+                        message: `Target file already exists: ${newPath}. Use overwrite=true to replace it.`
+                    };
+                }
+                catch (error) {
+                    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+                        throw error;
+                    }
+                }
+            }
+            await mkdir(dirname(newFullPath), { recursive: true });
+            if (overwrite) {
+                try {
+                    const targetStat = await stat(newFullPath);
+                    if (targetStat.isDirectory()) {
+                        return {
+                            success: false,
+                            oldPath,
+                            newPath,
+                            message: `Target path is a directory: ${newPath}. Please provide a file path.`
+                        };
+                    }
+                    await unlink(newFullPath);
+                }
+                catch (error) {
+                    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+                        throw error;
+                    }
+                }
+            }
+            try {
+                await rename(oldFullPath, newFullPath);
+            }
+            catch (error) {
+                if (error instanceof Error && 'code' in error && error.code === 'EXDEV') {
+                    await copyFile(oldFullPath, newFullPath);
+                    await unlink(oldFullPath);
+                }
+                else {
+                    throw error;
+                }
+            }
+            return {
+                success: true,
+                oldPath,
+                newPath,
+                message: `Successfully moved file from ${oldPath} to ${newPath}`
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                oldPath,
+                newPath,
+                message: `Failed to move file: ${error instanceof Error ? error.message : 'Unknown error'}`
+            };
+        }
+    }
     async readMultipleNotes(params) {
         const { paths, includeContent = true, includeFrontmatter = true } = params;
         if (paths.length > 10) {
@@ -595,19 +719,18 @@ export class FileSystemService {
             const entries = await readdir(dirPath, { withFileTypes: true });
             for (const entry of entries) {
                 const entryRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
-                if (!this.pathFilter.isAllowed(entryRelativePath)) {
-                    continue;
-                }
                 const fullEntryPath = join(dirPath, entry.name);
                 if (entry.isDirectory()) {
-                    // Also check if directory contents would be filtered (e.g., .obsidian/**)
-                    if (!this.pathFilter.isAllowed(`${entryRelativePath}/test.md`)) {
+                    if (!this.pathFilter.isAllowedForListing(entryRelativePath)) {
                         continue;
                     }
                     totalFolders++;
                     await scanDirectory(fullEntryPath, entryRelativePath);
                 }
                 else if (entry.isFile()) {
+                    if (!this.pathFilter.isAllowed(entryRelativePath)) {
+                        continue;
+                    }
                     totalNotes++;
                     const stats = await stat(fullEntryPath);
                     totalSize += stats.size;

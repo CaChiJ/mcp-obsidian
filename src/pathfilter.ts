@@ -21,6 +21,8 @@ export class PathFilter {
       '.md',
       '.markdown',
       '.txt',
+      '.base',    // Obsidian Bases (YAML)
+      '.canvas',  // Obsidian Canvas (JSON)
       ...config?.allowedExtensions || []
     ];
   }
@@ -47,11 +49,8 @@ export class PathFilter {
     // Normalize path separators
     const normalizedPath = path.replace(/\\/g, '/');
 
-    // Check if path matches any ignored pattern
-    for (const pattern of this.ignoredPatterns) {
-      if (this.simpleGlobMatch(pattern, normalizedPath)) {
-        return false;
-      }
+    if (this.isIgnoredPath(normalizedPath)) {
+      return false;
     }
 
     // For files, check extension if allowedExtensions is configured
@@ -65,6 +64,26 @@ export class PathFilter {
     }
 
     return true;
+  }
+
+  isAllowedForListing(path: string): boolean {
+    // Normalize path separators
+    const normalizedPath = path.replace(/\\/g, '/');
+
+    // Listing includes non-note files, but still blocks restricted system paths
+    return !this.isIgnoredPath(normalizedPath);
+  }
+
+  private isIgnoredPath(normalizedPath: string): boolean {
+
+    // Check if path matches any ignored pattern
+    for (const pattern of this.ignoredPatterns) {
+      if (this.simpleGlobMatch(pattern, normalizedPath)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private isFile(path: string): boolean {

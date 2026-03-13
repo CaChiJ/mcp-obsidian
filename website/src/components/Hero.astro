@@ -1,4 +1,5 @@
 ---
+import { Rocket } from 'lucide-react';
 import pkg from '../../../package.json';
 ---
 
@@ -37,7 +38,7 @@ import pkg from '../../../package.json';
 
     <!-- Gradient text -->
     <h1 class="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold mb-6">
-      <span class="gradient-text"> AI + Obsidian = 🚀 </span>
+      <span class="gradient-text inline-flex items-center gap-3">AI + Obsidian = <Rocket className="w-[0.9em] h-[0.9em] text-accent" aria-hidden="true" /></span>
     </h1>
 
     <!-- Tagline -->
@@ -49,6 +50,17 @@ import pkg from '../../../package.json';
     <p class="text-lg sm:text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
       This MCP server lets Claude, ChatGPT+, and other assistants access your vault. Locally, safe frontmatter, no cloud sync.
     </p>
+
+    <div class="mb-8 flex justify-center">
+      <a
+        href="/skill"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-green-400/50 bg-green-500/20 text-foreground hover:bg-green-500/30 transition-all duration-300"
+      >
+        <Rocket className="w-4 h-4 text-green-400" aria-hidden="true" />
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black text-green-300 border border-black leading-tight">JUST LAUNCHED</span>
+        <span class="text-sm sm:text-base">Obsidian Skill: smart MCP + app context + free Git sync</span>
+      </a>
+    </div>
 
     <!-- CTA Buttons -->
     <div
@@ -73,7 +85,7 @@ import pkg from '../../../package.json';
         Get Started
       </a>
       <a
-        href="https://github.com/bitbonsai/mcp-obsidian"
+        href="https://github.com/bitbonsai/mcpvault"
         target="_blank"
         rel="noopener noreferrer"
         class="inline-flex items-center gap-2 px-8 py-4 rounded-xl border border-border/50 hover:border-accent/50 text-foreground font-semibold text-lg transition-all duration-300 glass group"
@@ -96,18 +108,18 @@ import pkg from '../../../package.json';
       <div class="video-container rounded-lg overflow-hidden shadow-2xl">
         <div class="relative video-aspect-ratio">
           <video
+            id="hero-video"
             class="absolute inset-0 w-full h-full object-contain"
             controls
-            autoplay
             loop
             muted
-            preload="auto"
+            playsinline
+            preload="none"
             width="1152"
             height="720"
             poster="/video-poster-small.webp"
-            {...{ fetchpriority: "high" } as any}
           >
-            <source src="/mcp-obsidian-1-min.mp4" type="video/mp4" />
+            <source src="/mcpvault-1-min.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
         </div>
@@ -118,14 +130,14 @@ import pkg from '../../../package.json';
         class="flex flex-wrap items-center justify-center gap-3 mt-8 mb-8 opacity-75 hover:opacity-100 transition-opacity duration-300"
       >
         <a
-          href="https://github.com/bitbonsai/mcp-obsidian"
+          href="https://github.com/bitbonsai/mcpvault"
           target="_blank"
           rel="noopener noreferrer"
           class="transform hover:scale-105 transition-all duration-200 rounded hover:shadow-lg hover:shadow-accent/25"
           data-astro-cid-bbe6dxrz=""
         >
           <img
-            src="https://img.shields.io/github/stars/bitbonsai/mcp-obsidian?style=flat&logo=github&logoColor=white&color=9065ea&labelColor=262626"
+            src="https://img.shields.io/github/stars/bitbonsai/mcpvault?style=flat&logo=github&logoColor=white&color=9065ea&labelColor=262626"
             alt="GitHub Stars"
             class="h-6 rounded"
             loading="lazy"
@@ -133,26 +145,26 @@ import pkg from '../../../package.json';
           />
         </a>
         <a
-          href="https://www.npmjs.com/package/@mauricio.wolff/mcp-obsidian"
+          href="https://www.npmjs.com/package/mcpvault"
           target="_blank"
           rel="noopener noreferrer"
           class="transform hover:scale-105 transition-all duration-200 rounded hover:shadow-lg hover:shadow-accent/25"
         >
           <img
-            src="https://img.shields.io/npm/v/@mauricio.wolff/mcp-obsidian?style=flat&logo=npm&logoColor=white&color=9065ea&labelColor=262626"
+            src="https://img.shields.io/npm/v/%40bitbonsai%2Fmcpvault?style=flat&logo=npm&logoColor=white&color=9065ea&labelColor=262626"
             alt="npm version"
             class="h-6 rounded"
             loading="lazy"
           />
         </a>
         <a
-          href="https://www.npmjs.com/package/@mauricio.wolff/mcp-obsidian"
+          href="https://www.npmjs.com/package/mcpvault"
           target="_blank"
           rel="noopener noreferrer"
           class="transform hover:scale-105 transition-all duration-200 rounded hover:shadow-lg hover:shadow-accent/25"
         >
           <img
-            src="https://img.shields.io/npm/dt/@mauricio.wolff/mcp-obsidian?style=flat&logo=npm&logoColor=white&color=9065ea&labelColor=262626"
+            src="https://img.shields.io/npm/dt/%40bitbonsai%2Fmcpvault?style=flat&logo=npm&logoColor=white&color=9065ea&labelColor=262626"
             alt="npm downloads"
             class="h-6 rounded"
             loading="lazy"
@@ -201,6 +213,33 @@ import pkg from '../../../package.json';
     </div>
   </div>
 </section>
+
+<script is:inline>
+  const initHeroVideo = () => {
+    const heroVideo = document.getElementById('hero-video');
+    if (!heroVideo || heroVideo.tagName !== 'VIDEO') {
+      return;
+    }
+
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const effectiveType = connection && connection.effectiveType ? connection.effectiveType : '';
+    const constrainedNetwork = Boolean(connection && connection.saveData) || ['slow-2g', '2g', '3g'].includes(effectiveType);
+
+    if (isMobile || prefersReducedMotion || constrainedNetwork) {
+      heroVideo.preload = 'none';
+      return;
+    }
+
+    heroVideo.preload = 'metadata';
+    heroVideo.autoplay = true;
+    heroVideo.play().catch(() => {});
+  };
+
+  initHeroVideo();
+  document.addEventListener('astro:page-load', initHeroVideo, { once: true });
+</script>
 
 <style>
   /* Hero gradient with subtle noise */

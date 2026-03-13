@@ -3,51 +3,54 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
 import { FileSystemService } from "./src/filesystem.js";
-import { FrontmatterHandler } from "./src/frontmatter.js";
+import { FrontmatterHandler, parseFrontmatter } from "./src/frontmatter.js";
 import { PathFilter } from "./src/pathfilter.js";
 import { SearchService } from "./src/search.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
 // Get package.json version
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"));
 const VERSION = packageJson.version;
 // Handle --version and --help flags
-const arg = process.argv[2];
-if (arg === "--version" || arg === "-v") {
+const cliArgs = process.argv.slice(2);
+const firstArg = cliArgs[0];
+if (firstArg === "--version" || firstArg === "-v") {
     console.log(VERSION);
     process.exit(0);
 }
-if (arg === "--help" || arg === "-h") {
+if (firstArg === "--help" || firstArg === "-h") {
     console.log(`
 @mauricio.wolff/mcp-obsidian v${VERSION}
 
 Universal AI bridge for Obsidian vaults - connect any MCP-compatible assistant
 
 Usage:
-  npx @mauricio.wolff/mcp-obsidian <vault-path>
+  npx @mauricio.wolff/mcp-obsidian [vault-path]
 
 Arguments:
-  <vault-path>    Path to your Obsidian vault directory
+  [vault-path]    Optional path to your Obsidian vault directory
+                  Defaults to current working directory when omitted
 
 Options:
   --version, -v   Show version number
   --help, -h      Show this help message
 
 Examples:
+  npx @mauricio.wolff/mcp-obsidian
   npx @mauricio.wolff/mcp-obsidian ~/Documents/MyVault
+  npx @mauricio.wolff/mcp-obsidian ./Vault
   npx @mauricio.wolff/mcp-obsidian /path/to/obsidian/vault
+  npx @mauricio.wolff/mcp-obsidian "/path/with spaces/Obsidian Vault"
 `);
     process.exit(0);
 }
-const vaultPath = arg;
-if (!vaultPath) {
-    console.error("Usage: npx @mauricio.wolff/mcp-obsidian /path/to/vault");
-    console.error("Run 'npx @mauricio.wolff/mcp-obsidian --help' for more information");
-    process.exit(1);
-}
+// Join trailing args to support vault paths with spaces.
+// When omitted, default to current working directory.
+const vaultPathArg = cliArgs.join(' ').trim();
+const vaultPath = resolve(vaultPathArg || process.cwd());
 // Initialize services
 const pathFilter = new PathFilter();
 const frontmatterHandler = new FrontmatterHandler();
@@ -140,7 +143,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "list_directory",
-                description: "List files and directories in the vault",
+                description: "List files and directories in the vault (includes non-note filenames, while read/write tools remain note-only)",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -235,6 +238,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         }
                     },
                     required: ["oldPath", "newPath"]
+                }
+            },
+            {
+                name: "move_file",
+                description: "Move or rename any file in the vault (binary-safe, file-only, requires confirmation)",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        oldPath: {
+                            type: "string",
+                            description: "Current path of the file"
+                        },
+                        newPath: {
+                            type: "string",
+                            description: "New path for the file"
+                        },
+                        confirmOldPath: {
+                            type: "string",
+                            description: "Confirmation: must exactly match oldPath"
+                        },
+                        confirmNewPath: {
+                            type: "string",
+                            description: "Confirmation: must exactly match newPath"
+                        },
+                        overwrite: {
+                            type: "boolean",
+                            description: "Allow overwriting existing file (default: false)",
+                            default: false
+                        }
+                    },
+                    required: ["oldPath", "newPath", "confirmOldPath", "confirmNewPath"]
                 }
             },
             {
@@ -392,6 +426,12 @@ function trimPaths(args) {
     if (trimmed.confirmPath && typeof trimmed.confirmPath === 'string') {
         trimmed.confirmPath = trimmed.confirmPath.trim();
     }
+    if (trimmed.confirmOldPath && typeof trimmed.confirmOldPath === 'string') {
+        trimmed.confirmOldPath = trimmed.confirmOldPath.trim();
+    }
+    if (trimmed.confirmNewPath && typeof trimmed.confirmNewPath === 'string') {
+        trimmed.confirmNewPath = trimmed.confirmNewPath.trim();
+    }
     // Trim path arrays
     if (trimmed.paths && Array.isArray(trimmed.paths)) {
         trimmed.paths = trimmed.paths.map((p) => typeof p === 'string' ? p.trim() : p);
@@ -419,10 +459,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "write_note": {
+                const fm = parseFrontmatter(trimmedArgs.frontmatter);
                 await fileSystem.writeNote({
                     path: trimmedArgs.path,
                     content: trimmedArgs.content,
-                    frontmatter: trimmedArgs.frontmatter,
+                    ...(fm !== undefined && { frontmatter: fm }),
                     mode: trimmedArgs.mode || 'overwrite'
                 });
                 return {
@@ -515,6 +556,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     isError: !result.success
                 };
             }
+            case "move_file": {
+                const result = await fileSystem.moveFile({
+                    oldPath: trimmedArgs.oldPath,
+                    newPath: trimmedArgs.newPath,
+                    confirmOldPath: trimmedArgs.confirmOldPath,
+                    confirmNewPath: trimmedArgs.confirmNewPath,
+                    overwrite: trimmedArgs.overwrite
+                });
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: JSON.stringify(result, null, 2)
+                        }
+                    ],
+                    isError: !result.success
+                };
+            }
             case "read_multiple_notes": {
                 const result = await fileSystem.readMultipleNotes({
                     paths: trimmedArgs.paths,
@@ -535,9 +594,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "update_frontmatter": {
+                const fm = parseFrontmatter(trimmedArgs.frontmatter);
+                if (!fm) {
+                    throw new Error('frontmatter is required');
+                }
                 await fileSystem.updateFrontmatter({
                     path: trimmedArgs.path,
-                    frontmatter: trimmedArgs.frontmatter,
+                    frontmatter: fm,
                     merge: trimmedArgs.merge
                 });
                 return {

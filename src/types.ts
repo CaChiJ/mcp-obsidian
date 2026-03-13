@@ -70,10 +70,24 @@ export interface SearchResult {
   uri?: string;     // obsidianUri
 }
 
+export interface RankCandidate {
+  result: SearchResult;
+  termFreqs: Map<string, number>;
+  docLength: number;
+}
+
 // Move types
 export interface MoveNoteParams {
   oldPath: string;
   newPath: string;
+  overwrite?: boolean;
+}
+
+export interface MoveFileParams {
+  oldPath: string;
+  newPath: string;
+  confirmOldPath: string;
+  confirmNewPath: string;
   overwrite?: boolean;
 }
 

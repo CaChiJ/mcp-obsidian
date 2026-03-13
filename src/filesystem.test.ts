@@ -1,6 +1,7 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { FileSystemService } from "./filesystem.js";
-import { writeFile, mkdir, mkdtemp, rm } from "fs/promises";
+import { PathFilter } from "./pathfilter.js";
+import { writeFile, readFile, mkdir, mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -8,7 +9,7 @@ let testVaultPath: string;
 let fileSystem: FileSystemService;
 
 beforeEach(async () => {
-  testVaultPath = await mkdtemp(join(tmpdir(), "mcp-obsidian-test-"));
+  testVaultPath = await mkdtemp(join(tmpdir(), "mcpvault-test-"));
   fileSystem = new FileSystemService(testVaultPath);
 });
 
@@ -234,6 +235,86 @@ test("patch note fails with empty newString", async () => {
   expect(result.message).toMatch(/empty|filled|required/i);
 });
 
+test("patch note fails with undefined newString", async () => {
+  const testPath = "test-note.md";
+  const content = "# Test Note\n\nSome content.";
+
+  await writeFile(join(testVaultPath, testPath), content);
+
+  const result = await fileSystem.patchNote({
+    path: testPath,
+    oldString: "content",
+    newString: undefined as any,
+    replaceAll: false
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.message).toMatch(/empty|filled|required/i);
+
+  // Verify the note was NOT corrupted
+  const note = await fileSystem.readNote(testPath);
+  expect(note.content).not.toContain("undefined");
+  expect(note.content).toContain("Some content.");
+});
+
+test("patch note fails with null newString", async () => {
+  const testPath = "test-note.md";
+  const content = "# Test Note\n\nSome content.";
+
+  await writeFile(join(testVaultPath, testPath), content);
+
+  const result = await fileSystem.patchNote({
+    path: testPath,
+    oldString: "content",
+    newString: null as any,
+    replaceAll: false
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.message).toMatch(/empty|filled|required/i);
+
+  // Verify the note was NOT corrupted
+  const note = await fileSystem.readNote(testPath);
+  expect(note.content).not.toContain("null");
+  expect(note.content).toContain("Some content.");
+});
+
+test("writeNote rejects undefined content", async () => {
+  const testPath = "test-note.md";
+
+  await expect(fileSystem.writeNote({
+    path: testPath,
+    content: undefined as any
+  })).rejects.toThrow(/Content is required/);
+});
+
+test("writeNote rejects null content", async () => {
+  const testPath = "test-note.md";
+
+  await expect(fileSystem.writeNote({
+    path: testPath,
+    content: null as any
+  })).rejects.toThrow(/Content is required/);
+});
+
+test("writeNote append with undefined content does not corrupt note", async () => {
+  const testPath = "test-note.md";
+  const content = "# Test Note\n\nOriginal content.";
+
+  await writeFile(join(testVaultPath, testPath), content);
+
+  await expect(fileSystem.writeNote({
+    path: testPath,
+    content: undefined as any,
+    mode: 'append'
+  })).rejects.toThrow(/Content is required/);
+
+  // Verify the note was NOT corrupted
+  const note = await fileSystem.readNote(testPath);
+  expect(note.content).not.toContain("undefined");
+  expect(note.content).toContain("Original content.");
+});
+
 test("patch note handles regex special characters literally", async () => {
   const testPath = "test-note.md";
   const content = "Price: $10.50 (special)";
@@ -252,6 +333,44 @@ test("patch note handles regex special characters literally", async () => {
   const updatedNote = await fileSystem.readNote(testPath);
   expect(updatedNote.content).toContain("$15.75");
   expect(updatedNote.content).not.toContain("$10.50");
+});
+
+test("patch note works with fenced code blocks", async () => {
+  const testPath = "code-fence-test.md";
+  const content = "# Example\n\n```rust\nfn main() {\n    println!(\"hello\");\n}\n```\n";
+
+  await writeFile(join(testVaultPath, testPath), content);
+
+  const result = await fileSystem.patchNote({
+    path: testPath,
+    oldString: "println!(\"hello\");",
+    newString: "println!(\"hello world\");",
+    replaceAll: false
+  });
+
+  expect(result.success).toBe(true);
+
+  const updatedNote = await fileSystem.readNote(testPath);
+  expect(updatedNote.originalContent).toContain("println!(\"hello world\");");
+});
+
+test("patch note works with markdown tables", async () => {
+  const testPath = "table-test.md";
+  const content = "| Tool | Status |\n|---|---|\n| patch_note | flaky |\n";
+
+  await writeFile(join(testVaultPath, testPath), content);
+
+  const result = await fileSystem.patchNote({
+    path: testPath,
+    oldString: "| patch_note | flaky |",
+    newString: "| patch_note | stable |",
+    replaceAll: false
+  });
+
+  expect(result.success).toBe(true);
+
+  const updatedNote = await fileSystem.readNote(testPath);
+  expect(updatedNote.originalContent).toContain("| patch_note | stable |");
 });
 
 test("patch note preserves tabs and spaces", async () => {
@@ -644,6 +763,17 @@ test("frontmatter validation with invalid data", async () => {
   })).rejects.toThrow(/Invalid frontmatter/);
 });
 
+test("listDirectory includes non-note files but readNote still blocks them", async () => {
+  const imagePath = "assets/diagram.png";
+  await mkdir(join(testVaultPath, "assets"), { recursive: true });
+  await writeFile(join(testVaultPath, imagePath), "fake-png-content");
+
+  const listing = await fileSystem.listDirectory("assets");
+  expect(listing.files).toContain("diagram.png");
+
+  await expect(fileSystem.readNote(imagePath)).rejects.toThrow(/Access denied/);
+});
+
 // ============================================================================
 // NON-EXISTENT VAULT TESTS
 // ============================================================================
@@ -656,7 +786,7 @@ test("read from non-existent vault throws error", async () => {
 });
 
 test("write to non-existent vault creates directories", async () => {
-  const tempVault = await mkdtemp(join(tmpdir(), "mcp-obsidian-new-vault-"));
+  const tempVault = await mkdtemp(join(tmpdir(), "mcpvault-new-vault-"));
   const newFs = new FileSystemService(tempVault);
 
   try {
@@ -777,6 +907,118 @@ test("move note with special chars in both paths", async () => {
   expect(note.content).toContain("Moving note");
 });
 
+test("move_file moves binary files without corruption", async () => {
+  const oldPath = "attachments/original image.png";
+  const newPath = "assets/original image.png";
+  const binaryContent = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0x10, 0x42]);
+
+  await mkdir(join(testVaultPath, "attachments"), { recursive: true });
+  await writeFile(join(testVaultPath, oldPath), binaryContent);
+
+  const result = await fileSystem.moveFile({
+    oldPath,
+    newPath,
+    confirmOldPath: oldPath,
+    confirmNewPath: newPath
+  });
+  expect(result.success).toBe(true);
+
+  const moved = await readFile(join(testVaultPath, newPath));
+  expect(Buffer.compare(moved, binaryContent)).toBe(0);
+
+  await expect(readFile(join(testVaultPath, oldPath))).rejects.toMatchObject({ code: "ENOENT" });
+});
+
+test("move_file respects overwrite=false", async () => {
+  const oldPath = "attachments/image.png";
+  const newPath = "assets/image.png";
+
+  await mkdir(join(testVaultPath, "attachments"), { recursive: true });
+  await mkdir(join(testVaultPath, "assets"), { recursive: true });
+  await writeFile(join(testVaultPath, oldPath), Buffer.from([0x01, 0x02, 0x03]));
+  await writeFile(join(testVaultPath, newPath), Buffer.from([0xaa, 0xbb]));
+
+  const result = await fileSystem.moveFile({
+    oldPath,
+    newPath,
+    confirmOldPath: oldPath,
+    confirmNewPath: newPath,
+    overwrite: false
+  });
+  expect(result.success).toBe(false);
+  expect(result.message).toContain("Target file already exists");
+});
+
+test("move_file overwrites existing file when overwrite=true", async () => {
+  const oldPath = "attachments/image.png";
+  const newPath = "assets/image.png";
+  const replacement = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+
+  await mkdir(join(testVaultPath, "attachments"), { recursive: true });
+  await mkdir(join(testVaultPath, "assets"), { recursive: true });
+  await writeFile(join(testVaultPath, oldPath), replacement);
+  await writeFile(join(testVaultPath, newPath), Buffer.from([0x00]));
+
+  const result = await fileSystem.moveFile({
+    oldPath,
+    newPath,
+    confirmOldPath: oldPath,
+    confirmNewPath: newPath,
+    overwrite: true
+  });
+  expect(result.success).toBe(true);
+
+  const moved = await readFile(join(testVaultPath, newPath));
+  expect(Buffer.compare(moved, replacement)).toBe(0);
+});
+
+test("move_file rejects directory sources", async () => {
+  await mkdir(join(testVaultPath, "attachments/folder"), { recursive: true });
+
+  const result = await fileSystem.moveFile({
+    oldPath: "attachments/folder",
+    newPath: "assets/folder",
+    confirmOldPath: "attachments/folder",
+    confirmNewPath: "assets/folder"
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.message).toContain("supports files only");
+});
+
+test("move_file blocks restricted system paths", async () => {
+  const result = await fileSystem.moveFile({
+    oldPath: ".obsidian/plugins/data.json",
+    newPath: "assets/data.json",
+    confirmOldPath: ".obsidian/plugins/data.json",
+    confirmNewPath: "assets/data.json"
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.message).toContain("Access denied");
+});
+
+test("move_file requires matching confirmation paths", async () => {
+  const oldPath = "attachments/check.png";
+  const newPath = "assets/check.png";
+
+  await mkdir(join(testVaultPath, "attachments"), { recursive: true });
+  await writeFile(join(testVaultPath, oldPath), Buffer.from([0x11, 0x22]));
+
+  const result = await fileSystem.moveFile({
+    oldPath,
+    newPath,
+    confirmOldPath: "attachments/other.png",
+    confirmNewPath: newPath
+  });
+
+  expect(result.success).toBe(false);
+  expect(result.message).toContain("confirmation paths do not match");
+
+  const stillExists = await readFile(join(testVaultPath, oldPath));
+  expect(Buffer.compare(stillExists, Buffer.from([0x11, 0x22]))).toBe(0);
+});
+
 test("patch note with regex special chars in oldString", async () => {
   const testPath = "regex-test.md";
   const content = "Price: $10.50 (discount)";
@@ -891,6 +1133,41 @@ test("get vault stats excludes filtered paths", async () => {
   expect(stats.totalFolders).toBe(0); // .obsidian and .git are filtered
   expect(stats.recentlyModified.map(f => f.path)).toContain("visible.md");
   expect(stats.recentlyModified.map(f => f.path)).not.toContain(".obsidian/config.json");
+});
+
+test("get vault stats excludes files matched by custom ** ignored patterns", async () => {
+  const customFilter = new PathFilter({
+    ignoredPatterns: ["ignored/**"]
+  });
+  const customFileSystem = new FileSystemService(testVaultPath, customFilter);
+
+  await mkdir(join(testVaultPath, "ignored"), { recursive: true });
+  await mkdir(join(testVaultPath, "ignored/nested"), { recursive: true });
+  await writeFile(join(testVaultPath, "ignored/something.md"), "# Disallowed 1");
+  await writeFile(join(testVaultPath, "ignored/nested/something.md"), "# Disallowed 2");
+  await writeFile(join(testVaultPath, "visible.md"), "# Visible");
+
+  const stats = await customFileSystem.getVaultStats(10);
+  const recentPaths = stats.recentlyModified.map(file => file.path);
+
+  expect(stats.totalNotes).toBe(1);
+  expect(recentPaths).toContain("visible.md");
+  expect(recentPaths).not.toContain("ignored/something.md");
+  expect(recentPaths).not.toContain("ignored/nested/something.md");
+});
+
+test("get vault stats includes notes inside directories that contain dots", async () => {
+  await mkdir(join(testVaultPath, "2026.03"), { recursive: true });
+  await writeFile(join(testVaultPath, "2026.03/nested.md"), "# Nested");
+  await writeFile(join(testVaultPath, "root.md"), "# Root");
+
+  const stats = await fileSystem.getVaultStats(10);
+  const recentPaths = stats.recentlyModified.map(file => file.path);
+
+  expect(stats.totalNotes).toBe(2);
+  expect(stats.totalFolders).toBe(1);
+  expect(recentPaths).toContain("2026.03/nested.md");
+  expect(recentPaths).toContain("root.md");
 });
 
 test("get vault stats calculates total size correctly", async () => {

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-MCP-Obsidian is a Model Context Protocol (MCP) server that provides a universal AI bridge for Obsidian vaults. It enables any MCP-compatible AI assistant (Claude, ChatGPT, Gemini, etc.) to safely read and write notes in Obsidian vaults while preserving YAML frontmatter and enforcing security boundaries.
+MCP-Vault is a Model Context Protocol (MCP) server that provides a universal AI bridge for Obsidian vaults. It enables any MCP-compatible AI assistant (Claude, ChatGPT, Gemini, etc.) to safely read and write notes in Obsidian vaults while preserving YAML frontmatter and enforcing security boundaries.
 
 ## Commands
 
@@ -23,7 +23,7 @@ npm run publish:beta    # Publish with beta tag
 npm run publish:latest  # Publish as latest
 
 # Website
-npm run website         # Start Astro dev server (http://localhost:4321)
+npm run website         # Start Astro dev server with Bun (http://localhost:4321)
 
 # MCP Inspector
 npx @modelcontextprotocol/inspector npm start /path/to/vault
@@ -43,22 +43,22 @@ src/
   uri.ts               # Obsidian URI generation
   types.ts             # All TypeScript interfaces
   *.test.ts            # Co-located test files
-website/               # Astro 5 website (separate package, see website/agents.md)
+website/               # Astro 5 website (separate package, see website/AGENTS.md)
 ```
 
 ### Core Components
 
-**server.ts** — Entry point. Registers 13 MCP tools, handles CLI args (--help, --version, vault path), initializes services, routes tool calls. Auto-trims whitespace from all path arguments.
+**server.ts** — Entry point. Registers 14 MCP tools, handles CLI args (--help, --version, vault path), initializes services, routes tool calls. Auto-trims whitespace from all path arguments.
 
 **FileSystemService** (`src/filesystem.ts`) — Orchestrates file ops with security. Path resolution and traversal prevention. Implements: read, write, patch, delete, move, list, batch read, frontmatter update, tag management, vault stats. Uses native `fs/promises`.
 
 **FrontmatterHandler** (`src/frontmatter.ts`) — Parses/stringifies YAML frontmatter via `gray-matter`. Validates structure (blocks functions, symbols, invalid types). Preserves original content.
 
-**PathFilter** (`src/pathfilter.ts`) — Blocks `.obsidian/`, `.git/`, `node_modules/`, system files, dot files. Allows `.md`, `.markdown`, `.txt`. Checks path components independently.
+**PathFilter** (`src/pathfilter.ts`) — Blocks `.obsidian/`, `.git/`, `node_modules/`, system files, dot files. Note tools allow `.md`, `.markdown`, `.txt`; directory listings may include other file types by filename. Checks path components independently.
 
-**SearchService** (`src/search.ts`) — Content and frontmatter search. Returns token-optimized results with minified field names: `{p, t, ex, mc, ln, uri}`. Max 20 results.
+**SearchService** (`src/search.ts`) — Content and frontmatter search with multi-word matching and BM25 relevance reranking. Returns token-optimized results with minified field names: `{p, t, ex, mc, ln, uri}`. Max 20 results.
 
-### 13 MCP Tools
+### 14 MCP Tools
 
 | Tool | Description |
 |------|-------------|
@@ -69,6 +69,7 @@ website/               # Astro 5 website (separate package, see website/agents.m
 | delete_note | Delete a note (requires path confirmation) |
 | search_notes | Full-text search across vault content |
 | move_note | Move or rename a note |
+| move_file | Move or rename any file (binary-safe, file-only, requires path confirmation) |
 | read_multiple_notes | Batch read up to 10 notes |
 | update_frontmatter | Safely update YAML frontmatter |
 | get_notes_info | Get metadata without reading content |
@@ -100,7 +101,7 @@ The `website/` directory is a separate Astro package. It serves content in two f
 | HTML (rich, interactive) | `website/src/components/` | Browsers |
 | Markdown (plain text) | `website/public/*.md` + `llm.txt` | LLMs and AI agents |
 
-When updating content, always update both. See `website/agents.md` for full details and file mapping.
+When updating content, always update both. See `website/AGENTS.md` for full details and file mapping.
 
 ## Testing
 

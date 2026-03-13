@@ -38,6 +38,19 @@ describe("PathFilter", () => {
         expect(filter.isAllowed("data.json")).toBe(false);
         expect(filter.isAllowed("image.png")).toBe(false);
     });
+    test("allows non-note files for directory listing", () => {
+        const filter = new PathFilter();
+        expect(filter.isAllowedForListing("image.png")).toBe(true);
+        expect(filter.isAllowedForListing("docs/report.pdf")).toBe(true);
+        expect(filter.isAllowedForListing("archive/data.json")).toBe(true);
+    });
+    test("blocks restricted paths in directory listing", () => {
+        const filter = new PathFilter();
+        expect(filter.isAllowedForListing(".obsidian/app.json")).toBe(false);
+        expect(filter.isAllowedForListing(".git/config")).toBe(false);
+        expect(filter.isAllowedForListing("node_modules/pkg/index.js")).toBe(false);
+        expect(filter.isAllowedForListing(".DS_Store")).toBe(false);
+    });
     // ============================================================================
     // REGEX SPECIAL CHARACTERS - SECURITY TESTS
     // ============================================================================
@@ -162,6 +175,11 @@ describe("PathFilter", () => {
             expect(() => filter.isAllowed("%2e%2e/secret.md")).not.toThrow();
             expect(() => filter.isAllowed("..%2fnotes.md")).not.toThrow();
         });
+    });
+    test("allows Obsidian first-party file types", () => {
+        const filter = new PathFilter();
+        expect(filter.isAllowed("_Bases/daily-notes.base")).toBe(true);
+        expect(filter.isAllowed("canvas/mindmap.canvas")).toBe(true);
     });
     // ============================================================================
     // FILTER PATHS BATCH OPERATION

@@ -1,4 +1,5 @@
 ---
+import { FolderOpen, Settings, Target, Zap } from 'lucide-react';
 // Code examples for different configuration scenarios
 ---
 
@@ -10,7 +11,7 @@
         Configuration Examples
       </h2>
       <p class="text-xl text-muted-foreground max-w-3xl mx-auto">
-        From basic setup to advanced configurations, here's how to customize MCP-Obsidian for your workflow.
+        From basic setup to advanced configurations, here's how to customize MCP-Vault for your workflow.
       </p>
     </div>
 
@@ -18,19 +19,19 @@
     <div class="fade-in-on-scroll">
       <div class="flex flex-wrap justify-center gap-2 mb-8">
         <button class="config-tab active" data-tab="basic" aria-label="Basic Setup configuration example">
-          <span class="text-lg">⚡</span>
+          <Zap className="w-4 h-4" aria-hidden="true" />
           <span>Basic Setup</span>
         </button>
         <button class="config-tab" data-tab="advanced" aria-label="Advanced configuration example">
-          <span class="text-lg">🔧</span>
+          <Settings className="w-4 h-4" aria-hidden="true" />
           <span>Advanced</span>
         </button>
         <button class="config-tab" data-tab="multiple" aria-label="Multiple Vaults configuration example">
-          <span class="text-lg">📁</span>
+          <FolderOpen className="w-4 h-4" aria-hidden="true" />
           <span>Multiple Vaults</span>
         </button>
         <button class="config-tab" data-tab="filters" aria-label="Custom Filters configuration example">
-          <span class="text-lg">🎯</span>
+          <Target className="w-4 h-4" aria-hidden="true" />
           <span>Custom Filters</span>
         </button>
       </div>
@@ -42,7 +43,7 @@
           <div class="grid lg:grid-cols-2 gap-8">
             <div>
               <h3 class="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span class="text-lg">⚡</span>
+                <Zap className="w-5 h-5 text-accent" aria-hidden="true" />
                 Quick Start Configuration
               </h3>
               <p class="text-muted-foreground mb-6">
@@ -81,7 +82,7 @@
   "mcpServers": &#123;
     "obsidian": &#123;
       "command": "npx",
-      "args": ["@mauricio.wolff/mcp-obsidian@latest", "/Users/you/Documents/MyVault"]
+      "args": ["@bitbonsai/mcpvault@latest", "/Users/you/Documents/MyVault"]
     &#125;
   &#125;
 &#125;</code></pre>
@@ -95,11 +96,11 @@
           <div class="grid lg:grid-cols-2 gap-8">
             <div>
               <h3 class="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span class="text-lg">🔧</span>
+                <Settings className="w-5 h-5 text-accent" aria-hidden="true" />
                 Advanced Settings
               </h3>
               <p class="text-muted-foreground mb-6">
-                Fine-tune MCP-Obsidian's behavior with custom settings, logging, and performance options.
+                Fine-tune MCP-Vault's behavior with custom settings, logging, and performance options.
               </p>
               <div class="space-y-4">
                 <div class="flex items-center gap-2 text-sm text-accent">
@@ -135,7 +136,7 @@
     "obsidian": &#123;
       "command": "npx",
       "args": [
-        "@mauricio.wolff/mcp-obsidian@latest",
+        "@bitbonsai/mcpvault@latest",
         "/Users/you/Documents/MyVault",
         "--log-level", "debug",
         "--max-search-results", "50",
@@ -159,7 +160,7 @@
           <div class="grid lg:grid-cols-2 gap-8">
             <div>
               <h3 class="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span class="text-lg">📁</span>
+                <FolderOpen className="w-5 h-5 text-accent-2" aria-hidden="true" />
                 Multiple Vault Support
               </h3>
               <p class="text-muted-foreground mb-6">
@@ -198,16 +199,16 @@
   "mcpServers": &#123;
     "obsidian-work": &#123;
       "command": "npx",
-      "args": ["@mauricio.wolff/mcp-obsidian@latest", "/Users/you/Work/Notes"]
+      "args": ["@bitbonsai/mcpvault@latest", "/Users/you/Work/Notes"]
     &#125;,
     "obsidian-personal": &#123;
       "command": "npx",
-      "args": ["@mauricio.wolff/mcp-obsidian@latest", "/Users/you/Personal/Journal"]
+      "args": ["@bitbonsai/mcpvault@latest", "/Users/you/Personal/Journal"]
     &#125;,
     "obsidian-research": &#123;
       "command": "npx",
       "args": [
-        "@mauricio.wolff/mcp-obsidian@latest",
+        "@bitbonsai/mcpvault@latest",
         "/Users/you/Research/Papers",
         "--read-only", "true"
       ]
@@ -224,7 +225,7 @@
           <div class="grid lg:grid-cols-2 gap-8">
             <div>
               <h3 class="text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
-                <span class="text-lg">🎯</span>
+                <Target className="w-5 h-5 text-warning" aria-hidden="true" />
                 Smart Filtering
               </h3>
               <p class="text-muted-foreground mb-6">
@@ -264,7 +265,7 @@
     "obsidian": &#123;
       "command": "npx",
       "args": [
-        "@mauricio.wolff/mcp-obsidian@latest",
+        "@bitbonsai/mcpvault@latest",
         "/Users/you/Documents/MyVault",
         "--include-patterns", "*.md,!private/**",
         "--exclude-tags", "personal,draft",
