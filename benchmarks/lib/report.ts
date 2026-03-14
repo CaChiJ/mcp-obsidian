@@ -17,6 +17,7 @@ export function formatReport(report: BenchmarkReport): string {
     `Mean: ${fmt(report.latency.mean)}  P50: ${fmt(report.latency.p50)}  P95: ${fmt(report.latency.p95)}  P99: ${fmt(report.latency.p99)}`,
     '',
     `Reference: BEIR BM25 NDCG@10 ≈ 0.325`,
+    `Initialization: ${fmt(report.initializationMs)}ms`,
     `Duration: ${(report.durationMs / 1000).toFixed(1)}s`,
   ];
   return lines.join('\n');

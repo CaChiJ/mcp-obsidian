@@ -37,6 +37,9 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
   // Prepare search service
   const vectorStore = new VectorStore(vaultDir, embedder);
   const search = new SemanticSearchService(vaultDir, new PathFilter(), vectorStore);
+  const initializationStart = performance.now();
+  await search.initialize();
+  const initializationMs = performance.now() - initializationStart;
 
   // Run queries
   const kValues = [5, 10];
@@ -82,6 +85,7 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
     recall: avg(recallSums),
     mrr: avg(mrrSums),
     latency: latencyStats(latencies),
+    initializationMs,
     durationMs: performance.now() - totalStart,
   };
 }

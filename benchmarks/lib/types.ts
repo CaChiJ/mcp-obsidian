@@ -24,5 +24,6 @@ export interface BenchmarkReport {
   recall: Record<number, number>;
   mrr: Record<number, number>;
   latency: LatencyStats;
+  initializationMs: number;
   durationMs: number;
 }
