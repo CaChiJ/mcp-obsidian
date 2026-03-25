@@ -10,13 +10,13 @@ export interface Props {
 }
 
 const {
-  title = "MCP-Vault - Universal AI Bridge for Obsidian Vaults",
+  title = "MCPVault - Universal AI Bridge for Obsidian Vaults",
   description = "Connect ANY AI assistant to your Obsidian vault with the open MCP standard. Works with Claude, ChatGPT, and future AI tools. Private, secure, and future-proof.",
   image = "https://mcpvault.org/og-image.jpg",
   canonical = "https://mcpvault.org"
 } = Astro.props;
 
-const fullTitle = title.includes("MCP-Vault") ? title : `${title} | MCP-Vault`;
+const fullTitle = title.includes("MCPVault") ? title : `${title} | MCPVault`;
 ---
 
 <!doctype html>
@@ -40,7 +40,7 @@ const fullTitle = title.includes("MCP-Vault") ? title : `${title} | MCP-Vault`;
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
-    <meta property="og:site_name" content="MCP-Vault" />
+    <meta property="og:site_name" content="MCPVault" />
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
@@ -179,6 +179,37 @@ const fullTitle = title.includes("MCP-Vault") ? title : `${title} | MCP-Vault`;
         max-width: 100%;
       }
 
+      /* macOS-style scrollbars for all terminal pre elements */
+      .terminal-window pre {
+        scrollbar-width: thin;
+        scrollbar-color: transparent transparent;
+      }
+
+      .terminal-window pre:hover {
+        scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+      }
+
+      .terminal-window pre::-webkit-scrollbar {
+        height: 6px;
+      }
+
+      .terminal-window pre::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .terminal-window pre::-webkit-scrollbar-thumb {
+        background: transparent;
+        border-radius: 3px;
+      }
+
+      .terminal-window pre:hover::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .terminal-window pre:hover::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.5);
+      }
+
       /* Mobile terminal responsiveness */
       @media (max-width: 768px) {
         .terminal-window .font-mono,
@@ -268,7 +299,7 @@ const fullTitle = title.includes("MCP-Vault") ? title : `${title} | MCP-Vault`;
     <script is:inline type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "name": "MCP-Vault",
+      "name": "MCPVault",
       "description": "Universal AI bridge for Obsidian vaults using the Model Context Protocol. Connect any MCP-compatible AI assistant to your knowledge base.",
       "url": "https://mcpvault.org",
       "downloadUrl": "https://www.npmjs.com/package/mcpvault",
@@ -293,7 +324,7 @@ const fullTitle = title.includes("MCP-Vault") ? title : `${title} | MCP-Vault`;
       "codeRepository": "https://github.com/bitbonsai/mcpvault"
     })}></script>
   </head>
-  <body class="min-h-screen bg-background text-foreground antialiased relative pt-24">
+  <body class="min-h-screen bg-background text-foreground antialiased relative pt-16">
     <a href="#main-content" class="skip-link">Skip to content</a>
 
     <!-- Animated Obsidian Logo Background -->

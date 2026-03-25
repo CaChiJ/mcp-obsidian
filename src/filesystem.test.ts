@@ -1,7 +1,7 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { FileSystemService } from "./filesystem.js";
 import { PathFilter } from "./pathfilter.js";
-import { writeFile, readFile, mkdir, mkdtemp, rm } from "fs/promises";
+import { writeFile, readFile, mkdir, mkdtemp, rm, symlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -829,6 +829,84 @@ test("path traversal with nested .. is blocked", async () => {
     .rejects.toThrow(/Path traversal not allowed/);
 });
 
+// ============================================================================
+// SYMLINK SECURITY
+// ============================================================================
+
+test("symlink to file outside vault is blocked", async () => {
+  const outsideDir = await mkdtemp(join(tmpdir(), "mcpvault-outside-"));
+  const outsideFile = join(outsideDir, "secret.txt");
+  await writeFile(outsideFile, "SECRET DATA");
+
+  try {
+    await symlink(outsideFile, join(testVaultPath, "evil-link.md"));
+    await expect(fileSystem.readNote("evil-link.md"))
+      .rejects.toThrow(/Symlink target is outside vault/);
+  } finally {
+    await rm(outsideDir, { recursive: true });
+  }
+});
+
+test("symlink to file inside vault works", async () => {
+  const content = "# Real Note\n\nThis is inside the vault.";
+  await mkdir(join(testVaultPath, "deep"), { recursive: true });
+  await writeFile(join(testVaultPath, "deep/real-note.md"), content);
+  await symlink(join(testVaultPath, "deep/real-note.md"), join(testVaultPath, "shortcut.md"));
+
+  const note = await fileSystem.readNote("shortcut.md");
+  expect(note.content).toContain("This is inside the vault.");
+});
+
+test("symlink to directory outside vault is skipped in listDirectory", async () => {
+  const outsideDir = await mkdtemp(join(tmpdir(), "mcpvault-outside-"));
+  await writeFile(join(outsideDir, "secret.txt"), "SECRET");
+
+  try {
+    await symlink(outsideDir, join(testVaultPath, "evil-dir"));
+    const listing = await fileSystem.listDirectory("");
+    expect(listing.directories).not.toContain("evil-dir");
+    expect(listing.files).not.toContain("evil-dir");
+  } finally {
+    await rm(outsideDir, { recursive: true });
+  }
+});
+
+test("symlink to directory inside vault is listed", async () => {
+  await mkdir(join(testVaultPath, "real-folder"), { recursive: true });
+  await writeFile(join(testVaultPath, "real-folder/note.md"), "# Note");
+  await symlink(join(testVaultPath, "real-folder"), join(testVaultPath, "linked-folder"));
+
+  const listing = await fileSystem.listDirectory("");
+  expect(listing.directories).toContain("linked-folder");
+});
+
+test("broken symlink is handled gracefully", async () => {
+  await symlink("/nonexistent/path/file.md", join(testVaultPath, "broken-link.md"));
+
+  await expect(fileSystem.readNote("broken-link.md"))
+    .rejects.toThrow(/File not found/);
+});
+
+test("symlinked file outside vault is skipped in listDirectory", async () => {
+  const outsideDir = await mkdtemp(join(tmpdir(), "mcpvault-outside-"));
+  const outsideFile = join(outsideDir, "secret.txt");
+  await writeFile(outsideFile, "SECRET");
+
+  try {
+    await symlink(outsideFile, join(testVaultPath, "evil-file-link.md"));
+    const listing = await fileSystem.listDirectory("");
+    expect(listing.files).not.toContain("evil-file-link.md");
+  } finally {
+    await rm(outsideDir, { recursive: true });
+  }
+});
+
+test("write to new file in vault works (no symlink, ENOENT path)", async () => {
+  await fileSystem.writeNote({ path: "brand-new.md", content: "# New Note" });
+  const note = await fileSystem.readNote("brand-new.md");
+  expect(note.content).toContain("New Note");
+});
+
 test("path with regex special chars is treated literally", async () => {
   const testPath = "folder (copy)/note [1].md";
   const content = "# Test with special chars";
@@ -1199,4 +1277,92 @@ test("error messages include remediation suggestions for access denied", async (
 test("error messages include remediation suggestions for path traversal", async () => {
   await expect(fileSystem.readNote("../outside.md"))
     .rejects.toThrow(/within the vault/);
+});
+
+// ============================================================================
+// LIST ALL TAGS
+// ============================================================================
+
+test("listAllTags returns frontmatter tags with counts", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "---\ntags:\n  - project\n  - active\n---\n# Note 1");
+  await writeFile(join(testVaultPath, "note2.md"), "---\ntags:\n  - project\n  - done\n---\n# Note 2");
+
+  const tags = await fileSystem.listAllTags();
+  const projectTag = tags.find(t => t.tag === "project");
+  const activeTag = tags.find(t => t.tag === "active");
+  const doneTag = tags.find(t => t.tag === "done");
+
+  expect(projectTag?.count).toBe(2);
+  expect(activeTag?.count).toBe(1);
+  expect(doneTag?.count).toBe(1);
+});
+
+test("listAllTags returns inline hashtags with counts", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "# Note\nSome text #idea and #project here");
+  await writeFile(join(testVaultPath, "note2.md"), "# Note\nAnother #idea");
+
+  const tags = await fileSystem.listAllTags();
+  const ideaTag = tags.find(t => t.tag === "idea");
+  const projectTag = tags.find(t => t.tag === "project");
+
+  expect(ideaTag?.count).toBe(2);
+  expect(projectTag?.count).toBe(1);
+});
+
+test("listAllTags merges frontmatter and inline tags", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "---\ntags:\n  - project\n---\n# Note\nAlso #project inline");
+
+  const tags = await fileSystem.listAllTags();
+  const projectTag = tags.find(t => t.tag === "project");
+
+  expect(projectTag?.count).toBe(2);
+});
+
+test("listAllTags normalizes case", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "---\ntags:\n  - Project\n---\n# Note");
+  await writeFile(join(testVaultPath, "note2.md"), "# Note\n#project here");
+
+  const tags = await fileSystem.listAllTags();
+  const projectTag = tags.find(t => t.tag === "project");
+
+  expect(projectTag?.count).toBe(2);
+});
+
+test("listAllTags handles nested tags", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "---\ntags:\n  - status/active\n---\n# Note\n#status/done");
+
+  const tags = await fileSystem.listAllTags();
+  const activeTag = tags.find(t => t.tag === "status/active");
+  const doneTag = tags.find(t => t.tag === "status/done");
+
+  expect(activeTag?.count).toBe(1);
+  expect(doneTag?.count).toBe(1);
+});
+
+test("listAllTags returns sorted by count descending", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "---\ntags:\n  - rare\n  - common\n---\n# Note");
+  await writeFile(join(testVaultPath, "note2.md"), "---\ntags:\n  - common\n---\n# Note\n#common again");
+
+  const tags = await fileSystem.listAllTags();
+
+  expect(tags[0]?.tag).toBe("common");
+  expect(tags[0]?.count).toBe(3);
+});
+
+test("listAllTags returns empty array for vault with no tags", async () => {
+  await writeFile(join(testVaultPath, "note1.md"), "# Just a heading\nNo tags here");
+
+  const tags = await fileSystem.listAllTags();
+  expect(tags).toEqual([]);
+});
+
+test("listAllTags skips system directories", async () => {
+  await mkdir(join(testVaultPath, ".obsidian"), { recursive: true });
+  await writeFile(join(testVaultPath, ".obsidian/config.json"), '{"tags": ["hidden"]}');
+  await writeFile(join(testVaultPath, "note.md"), "---\ntags:\n  - visible\n---\n# Note");
+
+  const tags = await fileSystem.listAllTags();
+
+  expect(tags).toHaveLength(1);
+  expect(tags[0]?.tag).toBe("visible");
 });

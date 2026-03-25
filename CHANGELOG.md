@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-03-22
+
+### Added
+- New `list_all_tags` tool: scans all vault notes for frontmatter tags and inline `#hashtags`, returns deduplicated list sorted by frequency ([#80](https://github.com/bitbonsai/mcpvault/issues/80))
+- Obsidian CLI integration in the skill: preflight checks, command patterns for active file, daily notes, backlinks, and open-in-editor
+
+## [0.10.0] - 2026-03-20
+
+### Added
+- New `createServer(vaultPath, options?)` factory function for library consumers ([#84](https://github.com/bitbonsai/mcpvault/issues/84))
+- `src/index.ts` barrel exports for all public APIs and types
+- TypeScript declaration files (`.d.ts`) included in published package
+- `exports`, `types` fields in `package.json` for proper ESM library consumption
+
+### Changed
+- `server.ts` slimmed to ~60-line CLI entry point, all logic moved to `src/createServer.ts`
+- Test files excluded from `dist/` output
+- Minimum Node version bumped to 20 (Node 18 EOL)
+
+## [0.9.1] - 2026-03-20
+
+### Fixed
+- Symlinks inside the vault that resolve outside the vault boundary are now blocked, closing a path traversal bypass ([#78](https://github.com/bitbonsai/mcpvault/issues/78))
+- Circular symlinks (ELOOP) and permission-denied symlink targets (EACCES) return clear error messages
+- `list_directory` now includes symlinked files and directories when the target resolves within the vault (previously all symlinks were silently skipped)
+
+### Changed
+- Vault root path is now resolved through symlinks at startup for consistent boundary checks
+- Dropped Node 18 from CI test matrix (EOL since April 2025, vitest 4.1 requires Node 20+)
+
 ## [0.9.0] - 2026-03-12
 
 ### Changed

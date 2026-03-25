@@ -1,4 +1,4 @@
-# MCP-Vault - Universal AI Bridge for Obsidian Vaults
+# MCPVault - Universal AI Bridge for Obsidian Vaults
 
 **License:** MIT | **Free**
 
@@ -15,6 +15,9 @@ This MCP server lets Claude, ChatGPT+, and other assistants access your vault. L
 
 ## Recent Updates
 
+- **v0.11.0 (March 2026):** New `list_all_tags` tool: scan all vault notes for tags with occurrence counts. Obsidian skill now routes to CLI for active file, daily notes, backlinks, and open-in-editor. ([#80](https://github.com/bitbonsai/mcpvault/issues/80))
+- **v0.10.0 (March 2026):** New `createServer()` factory for library consumers. MCPVault can now be imported and connected to any MCP transport. TypeScript declarations and all public types exported. ([#84](https://github.com/bitbonsai/mcpvault/issues/84))
+- **v0.9.1 (March 2026):** Security fix: symlinks inside the vault that point outside the vault boundary are now blocked. ([#78](https://github.com/bitbonsai/mcpvault/issues/78))
 - **v0.9.0 (March 2026):** Package renamed to `@bitbonsai/mcpvault` on npm at Obsidian's request. Update your config: replace `mcpvault` with `@bitbonsai/mcpvault`
 - **v0.8.2 (March 2026):** Trailing-slash vault paths no longer truncate search results ([PR #48](https://github.com/bitbonsai/mcpvault/pull/48)), `get_vault_stats` now handles dotted folder names correctly ([PR #42](https://github.com/bitbonsai/mcpvault/pull/42)), note tools now support `.base` and `.canvas` ([PR #53](https://github.com/bitbonsai/mcpvault/pull/53)), string frontmatter inputs are now handled safely ([PR #47](https://github.com/bitbonsai/mcpvault/pull/47)), vault path is now optional in CLI mode (defaults to current working directory, [#50](https://github.com/bitbonsai/mcpvault/issues/50)), and dependency refreshes for the MCP SDK and Node types are merged ([PR #43](https://github.com/bitbonsai/mcpvault/pull/43), [PR #44](https://github.com/bitbonsai/mcpvault/pull/44))
 - **v0.8.1:** Multi-word BM25 search relevance improvements ([PR #38](https://github.com/bitbonsai/mcpvault/pull/38)), patch_note undefined/null validation hardening ([PR #37](https://github.com/bitbonsai/mcpvault/pull/37)), new `move_file` tool for binary-safe file moves with explicit path confirmation, binary filenames now visible in directory listings ([#21](https://github.com/bitbonsai/mcpvault/issues/21))

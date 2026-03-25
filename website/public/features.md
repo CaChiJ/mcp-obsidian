@@ -1,4 +1,4 @@
-# MCP-Vault Features
+# MCPVault Features
 
 Designed for safety, performance, and developer experience. Every feature gives AI intelligent access without compromising your data.
 
@@ -29,14 +29,14 @@ Fully typed for excellent developer experience.
 MIT licensed and community driven.
 
 ### Complete Toolkit
-14 MCP tools for vault management: read/write/patch/move files, search content, manage tags, update frontmatter, vault stats, and more. Built for AI assistant integration.
+15 MCP tools for vault management: read/write/patch/move files, search content, manage tags, update frontmatter, vault stats, and more. Built for AI assistant integration.
 
 ### Multi-Platform
 Works with Claude Desktop, ChatGPT+ Desktop, OpenCode, Gemini CLI, OpenAI Codex, Cursor IDE, Windsurf IDE, IntelliJ IDEA, and other MCP-compatible AI platforms.
 
 ## Comparison with Alternatives
 
-| Feature | MCP-Vault | Other MCP-Vault (Plugin-based) | Direct File Access |
+| Feature | MCPVault | Other MCPVault (Plugin-based) | Direct File Access |
 |---------|-------------|----------------------------------|-------------------|
 | Setup Complexity | Simple - just point to vault path | Complex - requires Obsidian plugin + API key | Variable |
 | Obsidian Running Required | No | Yes | No |
@@ -52,10 +52,10 @@ Works with Claude Desktop, ChatGPT+ Desktop, OpenCode, Gemini CLI, OpenAI Codex,
 ## FAQ
 
 ### Does my data leave my computer?
-Vault files stay local. MCP-Vault reads and writes files on your machine. Your AI provider only sees content your client sends.
+Vault files stay local. MCPVault reads and writes files on your machine. Your AI provider only sees content your client sends.
 
 ### Does Obsidian need to be running?
-No. MCP-Vault works via filesystem access, so Obsidian can be closed.
+No. MCPVault works via filesystem access, so Obsidian can be closed.
 
 ### Can I use multiple vaults?
 Yes. Configure multiple MCP server entries, one per vault path.

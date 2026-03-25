@@ -1,6 +1,6 @@
 import { join, resolve, relative, dirname } from 'path';
 import { readdir, stat, readFile, writeFile, unlink, mkdir, access, rename, copyFile } from 'node:fs/promises';
-import { constants } from 'node:fs';
+import { constants, realpathSync } from 'node:fs';
 import { FrontmatterHandler } from './frontmatter.js';
 import { PathFilter } from './pathfilter.js';
 import { generateObsidianUri } from './uri.js';
@@ -15,7 +15,13 @@ export class FileSystemService {
     pathFilter?: PathFilter,
     frontmatterHandler?: FrontmatterHandler
   ) {
-    this.vaultPath = resolve(vaultPath);
+    const resolved = resolve(vaultPath);
+    try {
+      this.vaultPath = realpathSync(resolved);
+    } catch {
+      // Vault path doesn't exist yet or is inaccessible; fall back to lexical resolution
+      this.vaultPath = resolved;
+    }
     this.pathFilter = pathFilter || new PathFilter();
     this.frontmatterHandler = frontmatterHandler || new FrontmatterHandler();
   }
@@ -36,10 +42,46 @@ export class FileSystemService {
 
     const fullPath = resolve(join(this.vaultPath, normalizedPath));
 
-    // Security check: ensure path is within vault
+    // Security check: ensure path is within vault (lexical)
     const relativeToVault = relative(this.vaultPath, fullPath);
     if (relativeToVault.startsWith('..')) {
       throw new Error(`Path traversal not allowed: ${relativePath}. Paths must be within the vault directory.`);
+    }
+
+    // Security check: ensure symlinks don't escape vault boundary
+    try {
+      const realPath = realpathSync(fullPath);
+      const realRelative = relative(this.vaultPath, realPath);
+      if (realRelative.startsWith('..')) {
+        throw new Error(`Symlink target is outside vault: ${relativePath}. Symbolic links must resolve to a path within the vault directory.`);
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && 'code' in err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === 'ENOENT') {
+          // File doesn't exist yet (e.g. writing a new note). Verify the parent directory resolves inside vault.
+          try {
+            const parentReal = realpathSync(dirname(fullPath));
+            const parentRelative = relative(this.vaultPath, parentReal);
+            if (parentRelative.startsWith('..')) {
+              throw new Error(`Symlink target is outside vault: ${relativePath}. Symbolic links must resolve to a path within the vault directory.`);
+            }
+          } catch (parentErr: unknown) {
+            // Parent doesn't exist either (will be created by mkdir). Lexical check above is sufficient.
+            if (parentErr instanceof Error && parentErr.message.includes('outside vault')) {
+              throw parentErr;
+            }
+          }
+        } else if (code === 'ELOOP') {
+          throw new Error(`Circular symlink detected: ${relativePath}. The symbolic link chain forms a loop.`);
+        } else if (code === 'EACCES') {
+          throw new Error(`Permission denied resolving symlink: ${relativePath}. Cannot verify the symbolic link target is within the vault.`);
+        } else {
+          throw err;
+        }
+      } else {
+        throw err;
+      }
     }
 
     return fullPath;
@@ -262,12 +304,29 @@ export class FileSystemService {
           continue;
         }
 
-        if (entry.isDirectory()) {
+        if (entry.isSymbolicLink()) {
+          // Follow symlinks that resolve inside the vault
+          try {
+            const entryFullPath = join(fullPath, entry.name);
+            const realPath = realpathSync(entryFullPath);
+            const realRelative = relative(this.vaultPath, realPath);
+            if (realRelative.startsWith('..')) {
+              continue; // Symlink target outside vault, skip silently
+            }
+            const targetStat = await stat(entryFullPath);
+            if (targetStat.isDirectory()) {
+              directories.push(entry.name);
+            } else if (targetStat.isFile()) {
+              files.push(entry.name);
+            }
+          } catch {
+            continue; // Broken/circular/inaccessible symlink, skip silently
+          }
+        } else if (entry.isDirectory()) {
           directories.push(entry.name);
         } else if (entry.isFile()) {
           files.push(entry.name);
         }
-        // Skip other types (symlinks, etc.)
       }
 
       return {
@@ -865,5 +924,56 @@ export class FileSystemService {
       totalSize,
       recentlyModified: recentFiles
     };
+  }
+
+  async listAllTags(): Promise<Array<{ tag: string; count: number }>> {
+    const tagCounts = new Map<string, number>();
+
+    const inlineTagRegex = /(?:^|\s)#([a-zA-Z][a-zA-Z0-9_/\-]*)/g;
+
+    const scanDirectory = async (dirPath: string, relativePath: string = ''): Promise<void> => {
+      const entries = await readdir(dirPath, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const entryRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+        const fullEntryPath = join(dirPath, entry.name);
+
+        if (entry.isDirectory()) {
+          if (!this.pathFilter.isAllowedForListing(entryRelativePath)) continue;
+          await scanDirectory(fullEntryPath, entryRelativePath);
+        } else if (entry.isFile() && this.pathFilter.isAllowed(entryRelativePath)) {
+          try {
+            const content = await readFile(fullEntryPath, 'utf-8');
+            const parsed = this.frontmatterHandler.parse(content);
+
+            // Frontmatter tags
+            const fmTags = parsed.frontmatter?.tags;
+            if (Array.isArray(fmTags)) {
+              for (const tag of fmTags) {
+                if (typeof tag === 'string' && tag.trim()) {
+                  const normalized = tag.trim().toLowerCase();
+                  tagCounts.set(normalized, (tagCounts.get(normalized) || 0) + 1);
+                }
+              }
+            }
+
+            // Inline #tags from body content
+            let match;
+            while ((match = inlineTagRegex.exec(parsed.content)) !== null) {
+              const normalized = match[1]!.toLowerCase();
+              tagCounts.set(normalized, (tagCounts.get(normalized) || 0) + 1);
+            }
+          } catch {
+            // Skip files that can't be read
+          }
+        }
+      }
+    };
+
+    await scanDirectory(this.vaultPath);
+
+    return Array.from(tagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
   }
 }
