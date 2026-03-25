@@ -1,7 +1,3 @@
-/**
- * In-memory vector store with disk cache and brute-force cosine search.
- */
-
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import type { EmbeddingAdapter } from '../embedding/types.js';
