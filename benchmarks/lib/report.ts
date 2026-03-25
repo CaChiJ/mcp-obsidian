@@ -12,12 +12,9 @@ export function formatReport(report: BenchmarkReport): string {
     metricRow('Recall', report.recall),
     metricRow('MRR', report.mrr),
     '',
-    'Latency (ms/query)',
-    '─'.repeat(32),
-    `Mean: ${fmt(report.latency.mean)}  P50: ${fmt(report.latency.p50)}  P95: ${fmt(report.latency.p95)}  P99: ${fmt(report.latency.p99)}`,
-    '',
     `Reference: BEIR BM25 NDCG@10 ≈ 0.325`,
-    `Initialization: ${fmt(report.initializationMs)}ms`,
+    `Initialization: ${fmt(report.initializationMs)}ms${report.peakInitMemoryMb !== undefined ? ` | Peak Memory: ${report.peakInitMemoryMb.toFixed(1)} MB` : ''}`,
+    `Search Latency: Mean ${fmt(report.latency.mean)}ms  P50 ${fmt(report.latency.p50)}ms  P95 ${fmt(report.latency.p95)}ms  P99 ${fmt(report.latency.p99)}ms${report.peakSearchMemoryMb !== undefined ? ` | Peak Memory: ${report.peakSearchMemoryMb.toFixed(1)} MB` : ''}`,
     `Duration: ${(report.durationMs / 1000).toFixed(1)}s`,
   ];
   return lines.join('\n');

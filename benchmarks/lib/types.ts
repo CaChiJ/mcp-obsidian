@@ -25,5 +25,7 @@ export interface BenchmarkReport {
   mrr: Record<number, number>;
   latency: LatencyStats;
   initializationMs: number;
+  peakInitMemoryMb?: number;
+  peakSearchMemoryMb?: number;
   durationMs: number;
 }

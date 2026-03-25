@@ -16,6 +16,7 @@ export interface RunOptions {
   maxQueries?: number;
   algorithm?: string;
   force?: boolean;
+  onPhase?: (event: 'start' | 'end', name: string) => void;
 }
 
 export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport> {
@@ -38,7 +39,9 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
   const vectorStore = new VectorStore(vaultDir, embedder);
   const search = new SemanticSearchService(vaultDir, new PathFilter(), vectorStore);
   const initializationStart = performance.now();
+  options.onPhase?.('start', 'init');
   await search.initialize();
+  options.onPhase?.('end', 'init');
   const initializationMs = performance.now() - initializationStart;
 
   // Run queries
@@ -48,6 +51,7 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
   const mrrSums: Record<number, number> = { 5: 0, 10: 0 };
   const latencies: number[] = [];
 
+  options.onPhase?.('start', 'search');
   let queryCount = 0;
   for (const [queryId, query] of queries) {
     if (maxQueries && queryCount >= maxQueries) break;
@@ -72,6 +76,7 @@ export async function runBenchmark(options: RunOptions): Promise<BenchmarkReport
     }
     queryCount++;
   }
+  options.onPhase?.('end', 'search');
 
   // Average metrics
   const avg = (sums: Record<number, number>) =>
