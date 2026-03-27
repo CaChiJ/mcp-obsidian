@@ -26,10 +26,15 @@ function splitIntoChunks(text: string, maxChars: number, overlapChars: number): 
     return chunks;
 }
 
+interface DocumentEntry {
+    mtime: number;
+    chunks: Float32Array[];
+}
+
 interface VectorEntry {
     path: string;
     mtime: number;
-    vector: number[];
+    chunks: number[][];
 }
 
 interface CacheFile {
@@ -43,7 +48,7 @@ export interface VectorSearchResult {
 }
 
 export class VectorStore {
-    private vectors = new Map<string, { mtime: number; vector: Float32Array }>();
+    private vectors = new Map<string, DocumentEntry>();
     private readonly cachePath: string;
     private dirty = false;
 
@@ -59,32 +64,24 @@ export class VectorStore {
     /** Ensure a document is indexed. Reads file, strips frontmatter, embeds. Skips if up-to-date. */
     async index(relativePath: string): Promise<void> {
         const modifiedTime = await this.getFileModifiedTime(relativePath);
-
-        const canonicalEntry =
-            this.vectors.get(relativePath) ?? this.vectors.get(`${relativePath}#0`);
-        if (canonicalEntry && canonicalEntry.mtime >= modifiedTime) return;
-
-        // Remove stale chunks before re-indexing (handles chunk count changes)
-        for (const key of [...this.vectors.keys()]) {
-            if (key === relativePath || key.startsWith(`${relativePath}#`)) {
-                this.vectors.delete(key);
-            }
-        }
+        const existing = this.vectors.get(relativePath);
+        if (existing && existing.mtime >= modifiedTime) return;
 
         const fullPath = join(this.vaultPath, relativePath);
         const raw = await readFile(fullPath, 'utf-8');
         const frontmatterMatch = raw.match(/^---\n[\s\S]*?\n---\n/);
         const body = frontmatterMatch ? raw.slice(frontmatterMatch[0].length) : raw;
 
-        const chunks = this.chunkSizeChars
+        const texts = this.chunkSizeChars
             ? splitIntoChunks(body, this.chunkSizeChars, Math.floor(this.chunkSizeChars * 0.1))
             : [body];
 
-        for (let i = 0; i < chunks.length; i++) {
-            const key = chunks.length === 1 ? relativePath : `${relativePath}#${i}`;
-            const vector = await this.embedder.embed(chunks[i]!, { kind: 'document' });
-            this.vectors.set(key, { mtime: modifiedTime, vector });
+        const chunks: Float32Array[] = [];
+        for (const text of texts) {
+            chunks.push(await this.embedder.embed(text, { kind: 'document' }));
         }
+
+        this.vectors.set(relativePath, { mtime: modifiedTime, chunks });
         this.dirty = true;
     }
 
@@ -92,39 +89,24 @@ export class VectorStore {
     async search(query: string, limit: number): Promise<VectorSearchResult[]> {
         const queryVec = await this.embedder.embed(query, { kind: 'query' });
 
-        const bestByPath = new Map<string, number>();
-        for (const [key, entry] of this.vectors) {
-            const path = key.includes('#') ? key.slice(0, key.lastIndexOf('#')) : key;
-            const score = cosineSimilarity(queryVec, entry.vector);
-            if (!bestByPath.has(path) || score > bestByPath.get(path)!) {
-                bestByPath.set(path, score);
-            }
+        const scored: VectorSearchResult[] = [];
+        for (const [path, entry] of this.vectors) {
+            const score = Math.max(...entry.chunks.map(c => cosineSimilarity(queryVec, c)));
+            scored.push({ path, score });
         }
 
-        return [...bestByPath.entries()]
-            .map(([path, score]) => ({ path, score }))
-            .sort((a, b) => b.score - a.score)
-            .slice(0, limit);
+        return scored.sort((a, b) => b.score - a.score).slice(0, limit);
     }
 
     /** Remove a path from the index. */
     remove(relativePath: string): void {
-        let removed = false;
-        for (const key of [...this.vectors.keys()]) {
-            if (key === relativePath || key.startsWith(`${relativePath}#`)) {
-                this.vectors.delete(key);
-                removed = true;
-            }
+        if (this.vectors.delete(relativePath)) {
+            this.dirty = true;
         }
-        if (removed) this.dirty = true;
     }
 
     get size(): number {
-        const paths = new Set<string>();
-        for (const key of this.vectors.keys()) {
-            paths.add(key.includes('#') ? key.slice(0, key.lastIndexOf('#')) : key);
-        }
-        return paths.size;
+        return this.vectors.size;
     }
 
     // ---- Persistence ----
@@ -140,7 +122,7 @@ export class VectorStore {
             for (const entry of cache.entries) {
                 this.vectors.set(entry.path, {
                     mtime: entry.mtime,
-                    vector: new Float32Array(entry.vector),
+                    chunks: entry.chunks.map(c => new Float32Array(c)),
                 });
             }
         } catch {
@@ -156,7 +138,7 @@ export class VectorStore {
             entries.push({
                 path,
                 mtime: entry.mtime,
-                vector: Array.from(entry.vector),
+                chunks: entry.chunks.map(c => Array.from(c)),
             });
         }
 
