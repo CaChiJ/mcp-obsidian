@@ -51,6 +51,7 @@ export class VectorStore {
         private readonly vaultPath: string,
         private readonly embedder: EmbeddingAdapter,
         private readonly chunkSizeChars?: number,
+        private readonly enableCache = true,
     ) {
         this.cachePath = join(vaultPath, '.mcpvault', 'embeddings.json');
     }
@@ -129,6 +130,7 @@ export class VectorStore {
     // ---- Persistence ----
 
     async loadCache(): Promise<void> {
+        if (!this.enableCache) return;
         try {
             const raw = await readFile(this.cachePath, 'utf-8');
             const cache: CacheFile = JSON.parse(raw);
