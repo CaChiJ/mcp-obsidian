@@ -1,9 +1,23 @@
 #!/usr/bin/env tsx
+import v8 from 'node:v8';
 import { runBenchmark } from '../lib/benchmark-runner.js';
 import { OnnxAdapter } from '../../src/embedding/onnx-adapter.js';
 import { GgufAdapter } from '../../src/embedding/gguf-adapter.js';
 import { jinaRetrievalPreprocessor } from '../../src/embedding/preprocessing.js';
 import type { EmbeddingAdapterOptions } from '../../src/embedding/types.js';
+
+// Take a heap snapshot once when V8 heap exceeds this threshold
+const HEAP_SNAPSHOT_THRESHOLD_MB = 3000;
+let heapSnapshotTaken = false;
+setInterval(() => {
+  if (heapSnapshotTaken) return;
+  const heapMb = process.memoryUsage().heapUsed / 1024 / 1024;
+  if (heapMb > HEAP_SNAPSHOT_THRESHOLD_MB) {
+    heapSnapshotTaken = true;
+    const path = v8.writeHeapSnapshot();
+    process.stderr.write(`[heap-snapshot] ${heapMb.toFixed(0)} MB → ${path}\n`);
+  }
+}, 500);
 
 interface WorkerConfig {
   adapterType: 'onnx' | 'gguf';
