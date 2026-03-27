@@ -14,6 +14,7 @@ export type EmbeddingPreprocessor = (input: EmbeddingPreprocessorInput) => strin
 
 export interface EmbeddingAdapterOptions {
     preprocessor?: EmbeddingPreprocessor;
+    contextSize?: number | { min?: number; max?: number };
 }
 
 export interface EmbeddingAdapter {

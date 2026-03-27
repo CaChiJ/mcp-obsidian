@@ -23,7 +23,7 @@ const runOptions = { datasetDir: DATASET_DIR, vaultDir: VAULT_DIR, maxQueries, a
 
 type EmbedderConfig =
   | { adapterType: 'onnx'; model: string }
-  | { adapterType: 'gguf'; model: string; quant: string };
+  | { adapterType: 'gguf'; model: string; quant: string; contextSize?: number | { min?: number; max?: number } };
 
 const GGUF_MODEL = 'jinaai/jina-embeddings-v5-text-nano-retrieval-GGUF';
 

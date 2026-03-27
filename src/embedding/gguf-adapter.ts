@@ -53,6 +53,8 @@ export class GgufAdapter implements EmbeddingAdapter {
         );
 
         const model = await llama.loadModel({ modelPath });
-        this.context = await model.createEmbeddingContext();
+        this.context = await model.createEmbeddingContext({
+            contextSize: this.options.contextSize ?? "auto",
+        });
     }
 }

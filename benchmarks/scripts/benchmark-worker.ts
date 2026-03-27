@@ -23,6 +23,7 @@ interface WorkerConfig {
   adapterType: 'onnx' | 'gguf';
   model: string;
   quant?: string;
+  contextSize?: number | { min?: number; max?: number };
   runOptions: {
     datasetDir: string;
     vaultDir: string;
@@ -35,7 +36,9 @@ interface WorkerConfig {
 const config: WorkerConfig = JSON.parse(process.argv[2]!);
 
 const options: EmbeddingAdapterOptions =
-  config.adapterType === 'gguf' ? { preprocessor: jinaRetrievalPreprocessor } : {};
+  config.adapterType === 'gguf'
+    ? { preprocessor: jinaRetrievalPreprocessor, contextSize: config.contextSize }
+    : {};
 
 const embedder =
   config.adapterType === 'onnx'
