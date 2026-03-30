@@ -15,17 +15,6 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
     return denom === 0 ? 0 : dot / denom;
 }
 
-function splitIntoChunks(text: string, maxChars: number, overlapChars: number): string[] {
-    if (text.length <= maxChars) return [text];
-    const chunks: string[] = [];
-    let start = 0;
-    while (start < text.length) {
-        chunks.push(text.slice(start, start + maxChars));
-        start += maxChars - overlapChars;
-    }
-    return chunks;
-}
-
 interface DocumentEntry {
     mtime: number;
     chunks: Float32Array[];
@@ -55,7 +44,6 @@ export class VectorStore {
     constructor(
         private readonly vaultPath: string,
         private readonly embedder: EmbeddingAdapter,
-        private readonly chunkSizeChars?: number,
         private readonly enableCache = true,
     ) {
         this.cachePath = join(vaultPath, '.mcpvault', 'embeddings.json');
@@ -72,26 +60,18 @@ export class VectorStore {
         const frontmatterMatch = raw.match(/^---\n[\s\S]*?\n---\n/);
         const body = frontmatterMatch ? raw.slice(frontmatterMatch[0].length) : raw;
 
-        const texts = this.chunkSizeChars
-            ? splitIntoChunks(body, this.chunkSizeChars, Math.floor(this.chunkSizeChars * 0.1))
-            : [body];
-
-        const chunks: Float32Array[] = [];
-        for (const text of texts) {
-            chunks.push(await this.embedder.embed(text, { kind: 'document' }));
-        }
-
+        const chunks = await this.embedder.embed(body, { kind: 'document' });
         this.vectors.set(relativePath, { mtime: modifiedTime, chunks });
         this.dirty = true;
     }
 
     /** Search for top-K most similar documents. */
     async search(query: string, limit: number): Promise<VectorSearchResult[]> {
-        const queryVec = await this.embedder.embed(query, { kind: 'query' });
+        const [queryVec] = await this.embedder.embed(query, { kind: 'query' });
 
         const scored: VectorSearchResult[] = [];
         for (const [path, entry] of this.vectors) {
-            const score = Math.max(...entry.chunks.map(c => cosineSimilarity(queryVec, c)));
+            const score = Math.max(...entry.chunks.map(c => cosineSimilarity(queryVec!, c)));
             scored.push({ path, score });
         }
 
