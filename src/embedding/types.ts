@@ -18,7 +18,7 @@ export interface EmbeddingAdapterOptions {
 }
 
 export interface EmbeddingAdapter {
-    embed(text: string, request: EmbeddingRequest): Promise<Float32Array>;
+    embed(text: string, request: EmbeddingRequest): Promise<Float32Array[]>;
     readonly dimensions: number;
     readonly modelId: string;
     readonly options: EmbeddingAdapterOptions;

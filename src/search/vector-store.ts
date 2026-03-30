@@ -15,10 +15,15 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
     return denom === 0 ? 0 : dot / denom;
 }
 
+interface DocumentEntry {
+    mtime: number;
+    chunks: Float32Array[];
+}
+
 interface VectorEntry {
     path: string;
     mtime: number;
-    vector: number[];
+    chunks: number[][];
 }
 
 interface CacheFile {
@@ -32,13 +37,14 @@ export interface VectorSearchResult {
 }
 
 export class VectorStore {
-    private vectors = new Map<string, { mtime: number; vector: Float32Array }>();
+    private vectors = new Map<string, DocumentEntry>();
     private readonly cachePath: string;
     private dirty = false;
 
     constructor(
         private readonly vaultPath: string,
         private readonly embedder: EmbeddingAdapter,
+        private readonly enableCache = true,
     ) {
         this.cachePath = join(vaultPath, '.mcpvault', 'embeddings.json');
     }
@@ -47,30 +53,29 @@ export class VectorStore {
     async index(relativePath: string): Promise<void> {
         const modifiedTime = await this.getFileModifiedTime(relativePath);
         const existing = this.vectors.get(relativePath);
-        if (existing && existing.mtime >= modifiedTime) { return; }
+        if (existing && existing.mtime >= modifiedTime) return;
 
         const fullPath = join(this.vaultPath, relativePath);
         const raw = await readFile(fullPath, 'utf-8');
         const frontmatterMatch = raw.match(/^---\n[\s\S]*?\n---\n/);
         const body = frontmatterMatch ? raw.slice(frontmatterMatch[0].length) : raw;
 
-        const vector = await this.embedder.embed(body, { kind: 'document' });
-        this.vectors.set(relativePath, { mtime: modifiedTime, vector });
+        const chunks = await this.embedder.embed(body, { kind: 'document' });
+        this.vectors.set(relativePath, { mtime: modifiedTime, chunks });
         this.dirty = true;
     }
 
     /** Search for top-K most similar documents. */
     async search(query: string, limit: number): Promise<VectorSearchResult[]> {
-        const queryVec = await this.embedder.embed(query, { kind: 'query' });
+        const [queryVec] = await this.embedder.embed(query, { kind: 'query' });
 
         const scored: VectorSearchResult[] = [];
         for (const [path, entry] of this.vectors) {
-            const score = cosineSimilarity(queryVec, entry.vector);
+            const score = Math.max(...entry.chunks.map(c => cosineSimilarity(queryVec!, c)));
             scored.push({ path, score });
         }
 
-        scored.sort((a, b) => b.score - a.score);
-        return scored.slice(0, limit);
+        return scored.sort((a, b) => b.score - a.score).slice(0, limit);
     }
 
     /** Remove a path from the index. */
@@ -87,6 +92,7 @@ export class VectorStore {
     // ---- Persistence ----
 
     async loadCache(): Promise<void> {
+        if (!this.enableCache) return;
         try {
             const raw = await readFile(this.cachePath, 'utf-8');
             const cache: CacheFile = JSON.parse(raw);
@@ -96,7 +102,7 @@ export class VectorStore {
             for (const entry of cache.entries) {
                 this.vectors.set(entry.path, {
                     mtime: entry.mtime,
-                    vector: new Float32Array(entry.vector),
+                    chunks: entry.chunks.map(c => new Float32Array(c)),
                 });
             }
         } catch {
@@ -112,7 +118,7 @@ export class VectorStore {
             entries.push({
                 path,
                 mtime: entry.mtime,
-                vector: Array.from(entry.vector),
+                chunks: entry.chunks.map(c => Array.from(c)),
             });
         }
 

@@ -26,7 +26,7 @@ export class GgufAdapter implements EmbeddingAdapter {
         return this._dimensions;
     }
 
-    async embed(text: string, request: EmbeddingRequest): Promise<Float32Array> {
+    async embed(text: string, request: EmbeddingRequest): Promise<Float32Array[]> {
         if (!this.context) {
             await this.init();
         }
@@ -37,10 +37,27 @@ export class GgufAdapter implements EmbeddingAdapter {
             this.modelId,
             this.options.preprocessor,
         );
-        const embedding = await this.context.getEmbeddingFor(formattedText);
-        const vec = new Float32Array(embedding.vector);
-        this._dimensions = vec.length;
-        return vec;
+        const tokens = this.context.model.tokenize(formattedText);
+        const maxTokens = this.context._llamaContext.contextSize;
+
+        if (tokens.length <= maxTokens) {
+            const embedding = await this.context.getEmbeddingFor(tokens);
+            const vec = new Float32Array(embedding.vector);
+            this._dimensions = vec.length;
+            return [vec];
+        }
+
+        const overlap = Math.floor(maxTokens * 0.1);
+        const chunks: Float32Array[] = [];
+
+        for (let start = 0; start < tokens.length; start += maxTokens - overlap) {
+            const chunkTokens = tokens.slice(start, start + maxTokens);
+            const embedding = await this.context.getEmbeddingFor(chunkTokens);
+            const vec = new Float32Array(embedding.vector);
+            this._dimensions = vec.length;
+            chunks.push(vec);
+        }
+        return chunks;
     }
 
     private async init(): Promise<void> {

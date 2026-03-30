@@ -20,9 +20,8 @@ export class OnnxAdapter implements EmbeddingAdapter {
         return this._dimensions;
     }
 
-    async embed(text: string, request: EmbeddingRequest): Promise<Float32Array> {
+    async embed(text: string, request: EmbeddingRequest): Promise<Float32Array[]> {
         if (!this.pipeline) {
-            // Dynamic import — optional dependency.
             const { pipeline } = await import('@huggingface/transformers');
             this.pipeline = await pipeline('feature-extraction', this.modelId, {
                 dtype: 'q4',
@@ -35,9 +34,27 @@ export class OnnxAdapter implements EmbeddingAdapter {
             this.modelId,
             this.options.preprocessor,
         );
-        const output = await this.pipeline(formattedText, { pooling: 'mean', normalize: true });
-        const data = output.data as Float32Array;
-        this._dimensions = data.length;
-        return data;
+        const tokenIds: number[] = this.pipeline.tokenizer.encode(formattedText);
+        const maxTokens: number = this.pipeline.tokenizer.model_max_length;
+
+        if (tokenIds.length <= maxTokens) {
+            const output = await this.pipeline(formattedText, { pooling: 'mean', normalize: true });
+            const vec = output.data as Float32Array;
+            this._dimensions = vec.length;
+            return [vec];
+        }
+
+        const overlap = Math.floor(maxTokens * 0.1);
+        const chunks: Float32Array[] = [];
+
+        for (let start = 0; start < tokenIds.length; start += maxTokens - overlap) {
+            const chunkIds = tokenIds.slice(start, start + maxTokens);
+            const chunkText: string = this.pipeline.tokenizer.decode(chunkIds);
+            const output = await this.pipeline(chunkText, { pooling: 'mean', normalize: true });
+            const vec = output.data as Float32Array;
+            this._dimensions = vec.length;
+            chunks.push(vec);
+        }
+        return chunks;
     }
 }
