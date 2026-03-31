@@ -17,7 +17,8 @@ export class GgufAdapter implements EmbeddingAdapter {
      * @param ggufFile Quantization variant, e.g. "Q4_K_M"
      */
     constructor(modelId: string, ggufFile: string, options: EmbeddingAdapterOptions = {}) {
-        this.modelId = `${modelId}:${ggufFile}`;
+        const ctxSuffix = options.contextSize != null ? `:ctx${JSON.stringify(options.contextSize)}` : '';
+        this.modelId = `${modelId}:${ggufFile}${ctxSuffix}`;
         this.ggufFile = ggufFile;
         this.options = options;
     }
